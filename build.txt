@@ -1,20 +1,47 @@
-Build Satu file (portable)
-pyinstaller ^
-  --name AutoBellSchedule ^
-  --onefile ^
-  --windowed ^
-  --noconsole ^
-  --icon=logo.ico ^
-  --add-data "logo.ico;." ^
+====================================================
+CARA BUILD APLIKASI - PILIH SALAH SATU
+====================================================
+
+RECOMMENDED: Build Satu file (portable) - SINGLE LINE
+py -m PyInstaller --name AutoBellSchedule --onefile --windowed --noconsole --icon=logo_smp.ico --add-data "logo_smp.ico;." main.py
+
+
+Build satu folder (startup cepat) - SINGLE LINE
+py -m PyInstaller --name SchoolBell --onedir --windowed --noconsole --icon=logo_smp.ico --add-data "logo_smp.ico;." main.py
+
+
+====================================================
+ALTERNATIF: Multi-line untuk readability
+====================================================
+
+Build Satu file (portable) - POWERSHELL (multi-line)
+py -m PyInstaller `
+  --name AutoBellSchedule `
+  --onefile `
+  --windowed `
+  --noconsole `
+  --icon=logo_smp.ico `
+  --add-data "logo_smp.ico;." `
   main.py
 
 
-Build satu folder (startup cepat)
-pyinstaller ^
-  --name SchoolBell ^
-  --onedir ^
-  --windowed ^
-  --noconsole ^
-  --icon=logo.ico ^
-  --add-data "logo.ico;." ^
+Build satu folder (startup cepat) - POWERSHELL (multi-line)
+py -m PyInstaller `
+  --name SchoolBell `
+  --onedir `
+  --windowed `
+  --noconsole `
+  --icon=logo_smp.ico `
+  --add-data "logo_smp.ico;." `
   main.py
+
+
+====================================================
+CATATAN PENTING:
+====================================================
+1. Pastikan PyInstaller sudah terinstall: py -m pip install pyinstaller
+2. File hasil build ada di folder: dist\
+3. Gunakan py -m PyInstaller, BUKAN hanya pyinstaller
+4. PowerShell: gunakan backtick ` untuk multi-line
+5. CMD: gunakan caret ^ untuk multi-line
+6. Tapi LEBIH MUDAH gunakan single line saja!

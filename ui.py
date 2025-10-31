@@ -1,4 +1,4 @@
-import os, socket, threading
+import os, socket, threading, re
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, timedelta
@@ -18,19 +18,40 @@ from trayicon import TrayController
 
 
 def valid_time_str(s: str) -> bool:
-    try:
-        datetime.strptime(s, "%H:%M")
-        return True
-    except:
-        return False
+    """
+    Validasi format waktu HH:MM (00:00 - 23:59)
+    Regex: ^(?:[01]\\d|2[0-3]):[0-5]\\d$
+    """
+    pattern = r'^(?:[01]\d|2[0-3]):[0-5]\d$'
+    return bool(re.match(pattern, s))
 
 
 class App(tk.Tk):
     def __init__(self, logo_path="logo.ico"):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("1120x740")
-        self.minsize(980, 620)
+        self.geometry("1280x800")
+        self.minsize(1100, 700)
+        
+        # Simpan logo path untuk digunakan di header
+        self.logo_path = logo_path
+
+        # Modern color scheme
+        self.colors = {
+            'bg': '#f5f6fa',
+            'primary': '#4834d4',
+            'secondary': '#686de0',
+            'success': '#26de81',
+            'danger': '#fc5c65',
+            'warning': '#fed330',
+            'dark': '#2c3e50',
+            'light': '#ffffff',
+            'text': '#2f3542',
+            'border': '#dfe4ea',
+            'card_shadow': '#c8d6e5'
+        }
+        
+        self.configure(bg=self.colors['bg'])
 
         ensure_dirs()
         self.conn = connect_db()
@@ -107,60 +128,217 @@ class App(tk.Tk):
 
     def _use_theme(self):
         style = ttk.Style(self)
-        for t in ("vista", "xpnative", "clam", "default"):
+        
+        # Use clam theme for better color support on headers
+        try:
+            style.theme_use("clam")
+        except:
             try:
-                style.theme_use(t); break
+                style.theme_use("vista")
             except:
-                continue
-        style.configure("Treeview", rowheight=26, font=("Segoe UI", 10))
-        style.configure("Heading", font=("Segoe UI", 10, "bold"))
-        style.configure("Clock.TLabel", font=("Segoe UI", 34, "bold"))
-        style.configure("Date.TLabel", font=("Segoe UI", 12))
-        style.configure("CardTitle.TLabel", font=("Segoe UI", 11, "bold"))
+                pass
+
+        # Configure styles with Poppins font
+        style.configure(".", 
+            font=("Poppins", 10),
+            background=self.colors['bg']
+        )
+        
+        style.configure("TFrame", background=self.colors['bg'])
+        style.configure("TLabel", 
+            background=self.colors['bg'],
+            foreground=self.colors['text'],
+            font=("Poppins", 10)
+        )
+        
+        style.configure("TButton",
+            font=("Poppins", 10, "bold"),
+            padding=(15, 8)
+        )
+        
+        style.configure("TEntry",
+            font=("Poppins", 10),
+            padding=8
+        )
+        
+        style.configure("TCheckbutton",
+            background=self.colors['bg'],
+            foreground=self.colors['text'],
+            font=("Poppins", 9)
+        )
+        
+        # Map checkbutton untuk indikator centang
+        style.map("TCheckbutton",
+            background=[('active', self.colors['bg']), ('!active', self.colors['bg'])],
+            foreground=[('active', self.colors['text']), ('!active', self.colors['text'])]
+        )
+
+        # Treeview styling
+        style.configure("Treeview",
+            background=self.colors['light'],
+            foreground=self.colors['text'],
+            fieldbackground=self.colors['light'],
+            font=("Poppins", 9),
+            rowheight=32,
+            borderwidth=0
+        )
+        
+        style.configure("Treeview.Heading",
+            background=self.colors['primary'],
+            foreground=self.colors['light'],
+            font=("Poppins", 10, "bold"),
+            relief="flat"
+        )
+        
+        style.map("Treeview.Heading",
+            background=[('active', self.colors['secondary'])]
+        )
+        
+        style.map("Treeview",
+            background=[('selected', self.colors['secondary'])],
+            foreground=[('selected', self.colors['light'])]
+        )
+
+        # Custom label styles
+        style.configure("Clock.TLabel",
+            font=("Poppins", 42, "bold"),
+            foreground=self.colors['primary'],
+            background=self.colors['bg']
+        )
+        
+        style.configure("Date.TLabel",
+            font=("Poppins", 13),
+            foreground=self.colors['text'],
+            background=self.colors['bg']
+        )
+        
+        style.configure("CardTitle.TLabel",
+            font=("Poppins", 12, "bold"),
+            foreground=self.colors['dark'],
+            background=self.colors['light']
+        )
+        
+        style.configure("Card.TFrame",
+            background=self.colors['light']
+        )
+        
+        style.configure("Card.TLabelframe",
+            background=self.colors['light'],
+            foreground=self.colors['dark'],
+            font=("Poppins", 11, "bold")
+        )
+        
+        style.configure("Card.TLabelframe.Label",
+            background=self.colors['light'],
+            foreground=self.colors['dark'],
+            font=("Poppins", 11, "bold")
+        )
 
     def _build_header(self):
-        header = ttk.Frame(self, padding=(12, 10))
-        header.pack(fill="x")
+        header = ttk.Frame(self, style="Card.TFrame", padding=(20, 15))
+        header.pack(fill="x", padx=15, pady=(15, 10))
 
-        left = ttk.Frame(header)
-        left.pack(side="left", fill="x", expand=True)
-        clock_box = ttk.Frame(left)
+        # Left side - Clock
+        left = ttk.Frame(header, style="Card.TFrame")
+        left.pack(side="left")
+        clock_box = ttk.Frame(left, style="Card.TFrame")
         clock_box.pack(side="left")
         self.lbl_jam = ttk.Label(clock_box, text="00:00:00", style="Clock.TLabel")
         self.lbl_jam.grid(row=0, column=0, sticky="w")
         self.lbl_tanggal = ttk.Label(clock_box, text="Senin, 1 Januari 2000", style="Date.TLabel")
-        self.lbl_tanggal.grid(row=1, column=0, sticky="w", pady=(2, 0))
+        self.lbl_tanggal.grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        right = ttk.Frame(header)
+        # Center - Logo SMP (expand untuk push ke tengah)
+        center = ttk.Frame(header, style="Card.TFrame")
+        center.pack(side="left", expand=True, fill="both")
+        
+        # Container untuk logo agar benar-benar center
+        logo_container = ttk.Frame(center, style="Card.TFrame")
+        logo_container.place(relx=0.5, rely=0.5, anchor="center")
+        
+        if hasattr(self, 'logo_path') and os.path.exists(self.logo_path):
+            try:
+                img = Image.open(self.logo_path)
+                # Resize logo untuk header
+                img = img.resize((80, 80), Image.Resampling.LANCZOS)
+                self.header_logo = ImageTk.PhotoImage(img)
+                
+                logo_label = tk.Label(
+                    logo_container,
+                    image=self.header_logo,
+                    bg=self.colors['light']
+                )
+                logo_label.pack()
+            except Exception:
+                pass
+
+        # Right side - Toggle and buttons
+        right = ttk.Frame(header, style="Card.TFrame")
         right.pack(side="right")
-        ms_frame = ttk.Frame(right)
+        
+        # Master toggle dengan label yang lebih jelas
+        ms_frame = ttk.Frame(right, style="Card.TFrame")
         ms_frame.pack(side="top", anchor="e")
-        ttk.Label(ms_frame,).pack(side="left", padx=(0, 8))
+        
+        toggle_label_frame = ttk.Frame(ms_frame, style="Card.TFrame")
+        toggle_label_frame.pack(side="left", padx=(0, 8))
+        ttk.Label(
+            toggle_label_frame, 
+            text="Master Control:",
+            font=("Poppins", 9, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['dark']
+        ).pack(side="top", anchor="e")
+        ttk.Label(
+            toggle_label_frame, 
+            text="(ON = Jadwal aktif, OFF = Semua jadwal berhenti)",
+            font=("Poppins", 7),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="top", anchor="e")
+        
         self.master_toggle = ToggleSwitch(ms_frame, on=True, command=self._on_master_toggle)
         self.master_toggle.pack(side="left")
 
+        # Autostart dengan label yang lebih jelas
+        autostart_frame = ttk.Frame(right, style="Card.TFrame")
+        autostart_frame.pack(side="top", anchor="e", pady=(10, 0))
+        
         self.autostart_var = tk.IntVar(value=1)
-        ttk.Checkbutton(
-            right,
-            text="Mulai aplikasi otomatis saat perangkat dihidupkan",
+        # Gunakan tk.Checkbutton untuk kontrol lebih baik atas tampilan
+        autostart_cb = tk.Checkbutton(
+            autostart_frame,
+            text="Jalankan otomatis saat komputer dinyalakan",
             variable=self.autostart_var,
             command=self._toggle_autostart,
-        ).pack(side="top", anchor="e", pady=(8, 0))
-
-        self.btn_stop = ttk.Button(right, text="Stop Suara", command=self._stop_sound)
-        self.btn_stop.pack(side="top", anchor="e", pady=(6, 0))
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            font=("Poppins", 9),
+            activebackground=self.colors['light'],
+            activeforeground=self.colors['text'],
+            selectcolor=self.colors['light'],
+            highlightthickness=0,
+            bd=0
+        )
+        autostart_cb.pack(side="left")
 
         if not self.audio.ok:
             ttk.Label(
-                right, foreground="red", text="⚠️ Audio tidak aktif. Jalankan: pip install pygame"
-            ).pack(side="top", anchor="e", pady=(6, 0))
+                right, foreground=self.colors['danger'], 
+                text="⚠️ Audio tidak aktif. Jalankan: pip install pygame",
+                background=self.colors['light'],
+                font=("Poppins", 9)
+            ).pack(side="top", anchor="e", pady=(8, 0))
 
-        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=12, pady=(6, 6))
-        card = ttk.Frame(self, padding=(12, 10))
-        card.pack(fill="x")
-        ttk.Label(card, text="Jadwal Berikutnya :", style="CardTitle.TLabel").pack(side="left")
-        self.lbl_next = ttk.Label(card, text="-")
-        self.lbl_next.pack(side="left", padx=(8, 0))
+        # Next schedule card
+        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=15, pady=(10, 10))
+        card = ttk.Frame(self, style="Card.TFrame", padding=(20, 12))
+        card.pack(fill="x", padx=15, pady=(0, 10))
+        ttk.Label(card, text="📅 Jadwal Berikutnya:", background=self.colors['light'], 
+                  font=("Poppins", 10), foreground=self.colors['text']).pack(side="left")
+        self.lbl_next = ttk.Label(card, text="-", background=self.colors['light'], 
+                                  font=("Poppins", 10, "bold"), foreground=self.colors['text'])
+        self.lbl_next.pack(side="left", padx=(10, 0))
 
     def _on_master_toggle(self, is_on: bool):
         self._set_status("Master ON: jadwal akan dieksekusi." if is_on else "Master OFF: semua jadwal dihentikan.")
@@ -181,64 +359,185 @@ class App(tk.Tk):
 
     def _build_panes(self):
         panes = ttk.PanedWindow(self, orient="horizontal")
-        panes.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        panes.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
-        # 50%
-        self.frm_left = ttk.Labelframe(panes, text="Form Jadwal", padding=12)
+        # Left panel - Form
+        self.frm_left = ttk.Labelframe(panes, text="📝 Form Jadwal", padding=22, style="Card.TLabelframe")
         panes.add(self.frm_left, weight=1)
 
         r = 0
-        ttk.Label(self.frm_left, text="Nama Jadwal").grid(row=r, column=0, sticky="w"); r += 1
+        ttk.Label(self.frm_left, text="Nama Jadwal", 
+                  font=("Poppins", 11, "bold"), 
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).grid(row=r, column=0, sticky="w", pady=(0, 6)); r += 1
         self.ent_name = ttk.Entry(self.frm_left)
-        self.ent_name.grid(row=r, column=0, sticky="we", pady=(0, 8))
+        self.ent_name.grid(row=r, column=0, sticky="we", pady=(0, 18))
         self.ent_name.bind("<KeyRelease>", lambda e: self._refresh_buttons_state()); r += 1
 
-        ttk.Label(self.frm_left, text="Waktu (JJ:MM, 24 jam)").grid(row=r, column=0, sticky="w"); r += 1
-        self.ent_time = ttk.Entry(self.frm_left, width=10)
-        self.ent_time.insert(0, "07:00")
-        self.ent_time.grid(row=r, column=0, sticky="w", pady=(0, 8))
-        self.ent_time.bind("<KeyRelease>", lambda e: self._refresh_buttons_state()); r += 1
+        ttk.Label(self.frm_left, text="⏰ Waktu (JJ:MM, 24 jam)",
+                  font=("Poppins", 11, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).grid(row=r, column=0, sticky="w", pady=(0, 6)); r += 1
+        
+        # Time picker dengan spinbox
+        time_frame = ttk.Frame(self.frm_left, style="Card.TFrame")
+        time_frame.grid(row=r, column=0, sticky="w", pady=(0, 12))
+        
+        # Validasi untuk spinbox jam
+        vcmd_hour = (self.register(self._validate_hour), '%P', '%S')
+        
+        # Spinbox untuk jam (00-23)
+        self.spin_hour = tk.Spinbox(
+            time_frame, 
+            from_=0, 
+            to=23, 
+            width=3,
+            font=("Poppins", 10),
+            format="%02.0f",
+            command=self._refresh_buttons_state,
+            justify='center',
+            validate='key',
+            validatecommand=vcmd_hour
+        )
+        self.spin_hour.delete(0, "end")
+        self.spin_hour.insert(0, "07")
+        self.spin_hour.bind('<FocusOut>', lambda e: self._format_hour())
+        self.spin_hour.bind('<Return>', lambda e: self._format_hour())
+        self.spin_hour.pack(side="left")
+        
+        # Label pemisah
+        ttk.Label(
+            time_frame, 
+            text=":", 
+            font=("Poppins", 12, "bold"),
+            background=self.colors['light']
+        ).pack(side="left", padx=3)
+        
+        # Validasi untuk spinbox menit
+        vcmd_minute = (self.register(self._validate_minute), '%P', '%S')
+        
+        # Spinbox untuk menit (00-59)
+        self.spin_minute = tk.Spinbox(
+            time_frame, 
+            from_=0, 
+            to=59, 
+            width=3,
+            font=("Poppins", 10),
+            format="%02.0f",
+            command=self._refresh_buttons_state,
+            justify='center',
+            validate='key',
+            validatecommand=vcmd_minute
+        )
+        self.spin_minute.delete(0, "end")
+        self.spin_minute.insert(0, "00")
+        self.spin_minute.bind('<FocusOut>', lambda e: self._format_minute())
+        self.spin_minute.bind('<Return>', lambda e: self._format_minute())
+        self.spin_minute.pack(side="left")
+        
+        r += 1
 
-        ttk.Label(self.frm_left, text="Hari Berlaku").grid(row=r, column=0, sticky="w"); r += 1
-        self.day_vars = []; day_frame = ttk.Frame(self.frm_left)
-        day_frame.grid(row=r, column=0, sticky="w", pady=(2, 8))
+        # Info label untuk hari berlaku
+        info_frame = ttk.Frame(self.frm_left, style="Card.TFrame")
+        info_frame.grid(row=r, column=0, sticky="w", pady=(8, 6))
+        ttk.Label(info_frame, text="📆 Hari Berlaku",
+                  font=("Poppins", 11, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="left")
+        ttk.Label(info_frame, text="(✔ Centang hari di mana jadwal ini akan aktif)",
+                  font=("Poppins", 9),
+                  background=self.colors['light'],
+                  foreground=self.colors['text'],
+                  style="TLabel").pack(side="left", padx=(8, 0))
+        r += 1
+        
+        self.day_vars = []; day_frame = ttk.Frame(self.frm_left, style="Card.TFrame")
+        day_frame.grid(row=r, column=0, sticky="w", pady=(4, 18))
         from utils import HARI_ID
         for i, nm in enumerate(HARI_ID):
             var = tk.IntVar(value=1 if i < 5 else 0)
-            ttk.Checkbutton(
-                day_frame, text=nm, variable=var, command=self._refresh_buttons_state
-            ).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 12), pady=2)
+            # Gunakan tk.Checkbutton untuk kontrol lebih baik atas tampilan
+            cb = tk.Checkbutton(
+                day_frame, 
+                text=nm, 
+                variable=var, 
+                command=self._refresh_buttons_state,
+                bg=self.colors['light'],
+                fg=self.colors['text'],
+                font=("Poppins", 10),
+                activebackground=self.colors['light'],
+                activeforeground=self.colors['text'],
+                selectcolor=self.colors['light'],
+                highlightthickness=0,
+                bd=0
+            )
+            # Tampilkan semua dalam 1 baris (horizontal)
+            cb.pack(side="left", padx=(0, 12))
             self.day_vars.append(var)
         r += 1
 
-        ttk.Label(self.frm_left, text="File Suara").grid(row=r, column=0, sticky="w"); r += 1
-        pick = ttk.Frame(self.frm_left); pick.grid(row=r, column=0, sticky="we", pady=(0, 6))
+        ttk.Label(self.frm_left, text="🔊 File Suara",
+                  font=("Poppins", 11, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).grid(row=r, column=0, sticky="w", pady=(0, 6)); r += 1
+        pick = ttk.Frame(self.frm_left, style="Card.TFrame"); pick.grid(row=r, column=0, sticky="we", pady=(0, 18))
         self.ent_sound = ttk.Entry(pick); self.ent_sound.pack(side="left", fill="x", expand=True)
         self.ent_sound.bind("<KeyRelease>", lambda e: self._refresh_buttons_state())
-        self.btn_pick = ttk.Button(pick, text="Pilih...", command=self._choose_sound); self.btn_pick.pack(side="left", padx=(6, 0))
-        self.btn_test = ttk.Button(pick, text="Tes", command=self._test_sound); self.btn_test.pack(side="left", padx=(6, 0))
+        self.btn_pick = ttk.Button(pick, text="📁 Pilih...", command=self._choose_sound); self.btn_pick.pack(side="left", padx=(8, 0))
+        self.btn_test = ttk.Button(pick, text="▶ Tes", command=self._test_sound); self.btn_test.pack(side="left", padx=(6, 0))
+        self.btn_stop = ttk.Button(pick, text="⏹ Stop", command=self._stop_sound); self.btn_stop.pack(side="left", padx=(6, 0))
         r += 1
 
-        ttk.Label(self.frm_left, text="Status").grid(row=r, column=0, sticky="w"); r += 1
+        # Info label untuk status jadwal
+        status_info_frame = ttk.Frame(self.frm_left, style="Card.TFrame")
+        status_info_frame.grid(row=r, column=0, sticky="w", pady=(0, 6))
+        ttk.Label(status_info_frame, text="✓ Status Jadwal",
+                  font=("Poppins", 11, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="left")
+        ttk.Label(status_info_frame, text="(✔ Centang untuk mengaktifkan jadwal ini)",
+                  font=("Poppins", 9),
+                  background=self.colors['light'],
+                  foreground=self.colors['text'],
+                  style="TLabel").pack(side="left", padx=(8, 0))
+        r += 1
+        
         self.active_var = tk.IntVar(value=1)
-        ttk.Checkbutton(
-            self.frm_left, text="Aktif (bunyi sesuai jadwal)", variable=self.active_var, command=self._refresh_buttons_state
-        ).grid(row=r, column=0, sticky="w"); r += 1
+        # Gunakan tk.Checkbutton untuk kontrol lebih baik atas tampilan
+        active_cb = tk.Checkbutton(
+            self.frm_left, 
+            text="Aktif", 
+            variable=self.active_var, 
+            command=self._refresh_buttons_state,
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            font=("Poppins", 10),
+            activebackground=self.colors['light'],
+            activeforeground=self.colors['text'],
+            selectcolor=self.colors['light'],
+            highlightthickness=0,
+            bd=0
+        )
+        active_cb.grid(row=r, column=0, sticky="w", pady=(0, 20))
+        r += 1
 
-        btns = ttk.Frame(self.frm_left); btns.grid(row=r, column=0, sticky="we", pady=(8, 0))
-        self.btn_add = ttk.Button(btns, text="Tambah", command=self._add_schedule); self.btn_add.pack(side="left")
-        self.btn_update = ttk.Button(btns, text="Perbarui", command=self._update_schedule); self.btn_update.pack(side="left", padx=6)
-        self.btn_delete = ttk.Button(btns, text="Hapus", command=self._delete_schedule); self.btn_delete.pack(side="left", padx=6)
+        btns = ttk.Frame(self.frm_left, style="Card.TFrame"); btns.grid(row=r, column=0, sticky="we", pady=(12, 0))
+        self.btn_add = ttk.Button(btns, text="➕ Tambah", command=self._add_schedule); self.btn_add.pack(side="left", padx=(0, 8))
+        self.btn_update = ttk.Button(btns, text="✏ Perbarui", command=self._update_schedule); self.btn_update.pack(side="left", padx=(0, 8))
+        self.btn_delete = ttk.Button(btns, text="🗑 Hapus", command=self._delete_schedule); self.btn_delete.pack(side="left")
         self.frm_left.columnconfigure(0, weight=1)
 
-        # 50%
-        self.frm_right = ttk.Labelframe(panes, text="Daftar Jadwal", padding=8)
+        # Right panel - Table
+        self.frm_right = ttk.Labelframe(panes, text="📋 Daftar Jadwal", padding=12, style="Card.TLabelframe")
         panes.add(self.frm_right, weight=3)
 
-        tools = ttk.Frame(self.frm_right); tools.pack(fill="x", pady=(2, 6))
-        ttk.Label(tools, text="Cari").pack(side="left")
+        tools = ttk.Frame(self.frm_right, style="Card.TFrame"); tools.pack(fill="x", pady=(4, 10))
+        ttk.Label(tools, text="🔍 Cari:",
+                  font=("Poppins", 9, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="left")
         self.search_var = tk.StringVar()
-        ent = ttk.Entry(tools, textvariable=self.search_var, width=30); ent.pack(side="left", padx=(6, 0))
+        ent = ttk.Entry(tools, textvariable=self.search_var, width=35); ent.pack(side="left", padx=(8, 0))
         self.search_var.trace_add("write", lambda *_: self._apply_filter())
 
         # === Tidak menampilkan ID; gunakan No (nomor urut) ===
@@ -279,13 +578,163 @@ class App(tk.Tk):
         self.tree.column("sound", width=w_sound)
 
     def _build_statusbar(self):
-        bar = ttk.Frame(self, padding=(12, 6)); bar.pack(fill="x")
-        ttk.Label(bar, text="Log :").pack(side="left")
-        self.status_var = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.status_var).pack(side="left", padx=8)
+        bar = ttk.Frame(self, style="Card.TFrame", padding=(20, 10)); bar.pack(fill="x", padx=15, pady=(0, 15))
+        ttk.Label(bar, text="📝 Log:", 
+                  font=("Poppins", 9, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="left")
+        self.status_var = tk.StringVar(value="Siap")
+        ttk.Label(bar, textvariable=self.status_var,
+                  background=self.colors['light'],
+                  foreground=self.colors['text'],
+                  font=("Poppins", 9)).pack(side="left", padx=10)
 
     def _set_status(self, text):
         self.status_var.set(text)
+    
+    def _get_time_from_spinbox(self):
+        """Mendapatkan waktu dari spinbox dalam format HH:MM"""
+        try:
+            hour = int(self.spin_hour.get())
+            minute = int(self.spin_minute.get())
+            # Pastikan dalam range yang valid
+            hour = max(0, min(23, hour))
+            minute = max(0, min(59, minute))
+            return f"{hour:02d}:{minute:02d}"
+        except:
+            return "00:00"
+    
+    def _set_time_to_spinbox(self, time_str):
+        """Set waktu ke spinbox dari format HH:MM"""
+        try:
+            parts = time_str.split(":")
+            if len(parts) == 2:
+                hour = int(parts[0])
+                minute = int(parts[1])
+                self.spin_hour.delete(0, "end")
+                self.spin_hour.insert(0, f"{hour:02d}")
+                self.spin_minute.delete(0, "end")
+                self.spin_minute.insert(0, f"{minute:02d}")
+        except:
+            pass
+    
+    def _validate_hour(self, new_value, input_char):
+        """
+        Validasi input jam manual:
+        - Hanya boleh angka
+        - Maksimal 2 digit
+        - Nilai maksimal 23
+        """
+        # Kosong diperbolehkan
+        if new_value == "":
+            return True
+        
+        # Hanya boleh angka
+        if not new_value.isdigit():
+            return False
+        
+        # Maksimal 2 digit
+        if len(new_value) > 2:
+            return False
+        
+        # Cek nilai maksimal 23
+        try:
+            val = int(new_value)
+            if val > 23:
+                return False
+        except:
+            return False
+        
+        return True
+    
+    def _validate_minute(self, new_value, input_char):
+        """
+        Validasi input menit manual:
+        - Hanya boleh angka
+        - Maksimal 2 digit
+        - Nilai maksimal 59
+        """
+        # Kosong diperbolehkan
+        if new_value == "":
+            return True
+        
+        # Hanya boleh angka
+        if not new_value.isdigit():
+            return False
+        
+        # Maksimal 2 digit
+        if len(new_value) > 2:
+            return False
+        
+        # Cek nilai maksimal 59
+        try:
+            val = int(new_value)
+            if val > 59:
+                return False
+        except:
+            return False
+        
+        return True
+    
+    def _format_hour(self):
+        """Format jam menjadi 2 digit saat focus out atau enter"""
+        try:
+            val = self.spin_hour.get().strip()
+            if val:
+                hour = int(val)
+                hour = max(0, min(23, hour))  # Pastikan dalam range 0-23
+                self.spin_hour.delete(0, "end")
+                self.spin_hour.insert(0, f"{hour:02d}")
+        except:
+            self.spin_hour.delete(0, "end")
+            self.spin_hour.insert(0, "00")
+        self._refresh_buttons_state()
+    
+    def _format_minute(self):
+        """Format menit menjadi 2 digit saat focus out atau enter"""
+        try:
+            val = self.spin_minute.get().strip()
+            if val:
+                minute = int(val)
+                minute = max(0, min(59, minute))  # Pastikan dalam range 0-59
+                self.spin_minute.delete(0, "end")
+                self.spin_minute.insert(0, f"{minute:02d}")
+        except:
+            self.spin_minute.delete(0, "end")
+            self.spin_minute.insert(0, "00")
+        self._refresh_buttons_state()
+    
+    def _validate_time_input(self, new_value):
+        """
+        Validasi input waktu real-time:
+        - Hanya boleh angka dan titik dua (:)
+        - Maksimal 5 karakter (HH:MM)
+        - Format partial selama mengetik: H, HH, HH:, HH:M, HH:MM
+        """
+        if new_value == "":
+            return True
+        
+        # Hanya boleh angka dan titik dua
+        if not re.match(r'^[0-9:]*$', new_value):
+            return False
+        
+        # Maksimal 5 karakter
+        if len(new_value) > 5:
+            return False
+        
+        # Validasi format partial
+        if len(new_value) <= 2:
+            # Hanya jam (H atau HH)
+            return new_value.isdigit()
+        elif len(new_value) == 3:
+            # Format HH: atau HH harus ada titik dua di posisi 2
+            return new_value[2] == ':' and new_value[:2].isdigit()
+        else:
+            # Format HH:M atau HH:MM
+            parts = new_value.split(':')
+            if len(parts) != 2:
+                return False
+            return parts[0].isdigit() and parts[1].isdigit()
 
     def _tick_clock(self):
         h, t, j = now_id_strings()
@@ -297,7 +746,7 @@ class App(tk.Tk):
 
     def _is_form_valid(self):
         name = self.ent_name.get().strip()
-        time_str = self.ent_time.get().strip()
+        time_str = self._get_time_from_spinbox()
         days_idxs = [i for i, v in enumerate(self.day_vars) if v.get() == 1]
         sound = self.ent_sound.get().strip()
         return (
@@ -434,7 +883,7 @@ class App(tk.Tk):
 
     def _collect_form(self):
         name = self.ent_name.get().strip()
-        time_str = self.ent_time.get().strip()
+        time_str = self._get_time_from_spinbox()
         days_idxs = [i for i, v in enumerate(self.day_vars) if v.get() == 1]
         days_csv = ",".join(str(x) for x in days_idxs)
         sound_path = self.ent_sound.get().strip()
@@ -503,7 +952,7 @@ class App(tk.Tk):
             self._refresh_buttons_state(); return
         name, time_str, days_csv, sound_path, active = row
         self.ent_name.delete(0, tk.END); self.ent_name.insert(0, name)
-        self.ent_time.delete(0, tk.END); self.ent_time.insert(0, time_str)
+        self._set_time_to_spinbox(time_str)
         for v in self.day_vars: v.set(0)
         for i in parse_days_csv(days_csv):
             if 0 <= i < len(self.day_vars): self.day_vars[i].set(1)
