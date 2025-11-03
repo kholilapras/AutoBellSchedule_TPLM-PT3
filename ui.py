@@ -1185,7 +1185,7 @@ class App(tk.Tk):
         
         ttk.Label(
             dark_frame,
-            text="🌙 Dark Mode",
+            text="🌙 Mode Gelap (Dark Mode)",
             font=("Poppins", 11, "bold"),
             background=self.colors['light'],
             foreground=self.colors['text']
@@ -1211,7 +1211,7 @@ class App(tk.Tk):
         
         ttk.Label(
             autostart_frame,
-            text="🚀 Autostart",
+            text="🚀 Jalankan Otomatis (Autostart)",
             font=("Poppins", 11, "bold"),
             background=self.colors['light'],
             foreground=self.colors['text']
