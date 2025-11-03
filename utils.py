@@ -5,7 +5,8 @@ import warnings
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
-APP_TITLE = "AutoBellSchedule"
+APP_TITLE = "AutoBellSchedule - SMP Muhammadiyah 3 Purwokerto"
+APP_VERSION = "1.0.0"
 CONTROL_PORT = 51233
 
 def resource_path(relative_path: str) -> str:

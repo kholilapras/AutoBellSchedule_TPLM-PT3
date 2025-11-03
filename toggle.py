@@ -32,20 +32,23 @@ class ToggleSwitch(tk.Canvas):
     def _redraw(self):
         self.delete("all")
         pad = 2
-        h = int(self.winfo_height()) or self._ch
-        w = int(self.winfo_width()) or self._cw
+        # Gunakan ukuran yang disimpan untuk konsistensi
+        h = self._ch
+        w = self._cw
         on_col = "#2ecc71"
         off_col = "#555555"
         track = on_col if self._on else off_col
 
+        # Track (background rounded rectangle)
         self.create_oval(pad, pad, h-pad, h-pad, fill=track, outline=track)
         self.create_oval(w-h+pad, pad, w-pad, h-pad, fill=track, outline=track)
         self.create_rectangle(h//2, pad, w-h//2, h-pad, fill=track, outline=track)
 
-        # Knob
+        # Knob (bulatan putih tanpa outline)
         kx = w - h + pad if self._on else pad
-        self.create_oval(kx, pad, kx + h - pad*2, h - pad, fill="#ffffff", outline="#dddddd")
+        self.create_oval(kx, pad, kx + h - pad*2, h - pad, fill="#ffffff", outline="#ffffff")
 
+        # Label ON/OFF
         if self._on:
             tx = int(h*0.55)
             label = "ON"

@@ -4,7 +4,7 @@ from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, timedelta
 
 from utils import (
-    APP_TITLE, ensure_dirs, now_id_strings, format_id_date,
+    APP_TITLE, APP_VERSION, ensure_dirs, now_id_strings, format_id_date,
     autostart_enabled, set_autostart, CONTROL_PORT,
     get_initial_sound_dir, remember_sound_dir
 )
@@ -12,6 +12,7 @@ from storage import connect_db, parse_days_csv, days_to_label
 from audio import AudioPlayer
 from worker import BellWorker
 from toggle import ToggleSwitch
+from rounded_button import RoundedButton
 
 from PIL import Image, ImageTk
 from trayicon import TrayController
@@ -36,8 +37,11 @@ class App(tk.Tk):
         # Simpan logo path untuk digunakan di header
         self.logo_path = logo_path
 
-        # Modern color scheme
-        self.colors = {
+        # Dark mode state
+        self.dark_mode = False
+        
+        # Color schemes
+        self.light_colors = {
             'bg': '#f5f6fa',
             'primary': '#4834d4',
             'secondary': '#686de0',
@@ -51,6 +55,22 @@ class App(tk.Tk):
             'card_shadow': '#c8d6e5'
         }
         
+        self.dark_colors = {
+            'bg': '#0f0f0f',           # Background utama - lebih gelap
+            'primary': '#8b5cf6',       # Primary purple - lebih terang untuk visibility
+            'secondary': '#a78bfa',     # Secondary purple
+            'success': '#22c55e',       # Success green - lebih terang
+            'danger': '#ef4444',        # Danger red
+            'warning': '#fbbf24',       # Warning yellow - lebih terang
+            'dark': '#f3f4f6',          # Text gelap untuk dark mode (jadi terang)
+            'light': '#1f1f1f',         # Card background - gelap tapi kontras dengan bg
+            'text': '#f3f4f6',          # Text color - putih keabuan
+            'border': '#404040',        # Border - abu gelap
+            'card_shadow': '#000000'    # Shadow - hitam
+        }
+        
+        # Set initial colors
+        self.colors = self.light_colors.copy()
         self.configure(bg=self.colors['bg'])
 
         ensure_dirs()
@@ -58,6 +78,9 @@ class App(tk.Tk):
         self.audio = AudioPlayer()
         self._next_cache = None
         self._next_cache_ts = 0
+        
+        # Autostart variable
+        self.autostart_var = tk.IntVar(value=1)
 
         try:
             if not autostart_enabled():
@@ -67,9 +90,9 @@ class App(tk.Tk):
 
         self._set_window_icon(logo_path)
         self._use_theme()
+        self._build_menu()
         self._build_header()
         self._build_panes()
-        self._build_statusbar()
         self._load_table()
 
         self.worker = BellWorker(
@@ -153,12 +176,64 @@ class App(tk.Tk):
         
         style.configure("TButton",
             font=("Poppins", 10, "bold"),
-            padding=(15, 8)
+            padding=(15, 8),
+            background=self.colors['primary'],
+            foreground='#ffffff',
+            borderwidth=0
+        )
+        
+        style.map("TButton",
+            background=[
+                ('active', self.colors['secondary']), 
+                ('pressed', self.colors['secondary']),
+                ('disabled', self.colors['border'])  # Redup saat disabled
+            ],
+            foreground=[
+                ('active', '#ffffff'), 
+                ('pressed', '#ffffff'),
+                ('disabled', '#9ca3af')  # Text abu-abu saat disabled
+            ]
+        )
+        
+        style.configure("Primary.TButton",
+            font=("Poppins", 9, "bold"),
+            padding=(12, 6),
+            background=self.colors['primary'],
+            foreground='#ffffff',
+            borderwidth=0
+        )
+        
+        style.map("Primary.TButton",
+            background=[
+                ('active', self.colors['secondary']), 
+                ('pressed', self.colors['secondary']),
+                ('disabled', self.colors['border'])  # Redup saat disabled
+            ],
+            foreground=[
+                ('active', '#ffffff'), 
+                ('pressed', '#ffffff'),
+                ('disabled', '#9ca3af')  # Text abu-abu saat disabled
+            ]
         )
         
         style.configure("TEntry",
             font=("Poppins", 10),
-            padding=8
+            padding=8,
+            fieldbackground=self.colors['light'],
+            foreground=self.colors['text'],
+            borderwidth=1,
+            relief="solid"
+        )
+        
+        style.map("TEntry",
+            fieldbackground=[
+                ('focus', self.colors['light']),
+                ('disabled', self.colors['bg'])  # Background redup saat disabled
+            ],
+            foreground=[
+                ('focus', self.colors['text']),
+                ('disabled', '#9ca3af')  # Text abu-abu saat disabled
+            ]
         )
         
         style.configure("TCheckbutton",
@@ -169,8 +244,16 @@ class App(tk.Tk):
         
         # Map checkbutton untuk indikator centang
         style.map("TCheckbutton",
-            background=[('active', self.colors['bg']), ('!active', self.colors['bg'])],
-            foreground=[('active', self.colors['text']), ('!active', self.colors['text'])]
+            background=[
+                ('active', self.colors['bg']), 
+                ('!active', self.colors['bg']),
+                ('disabled', self.colors['bg'])
+            ],
+            foreground=[
+                ('active', self.colors['text']), 
+                ('!active', self.colors['text']),
+                ('disabled', '#9ca3af')  # Text abu-abu saat disabled
+            ]
         )
 
         # Treeview styling
@@ -185,7 +268,7 @@ class App(tk.Tk):
         
         style.configure("Treeview.Heading",
             background=self.colors['primary'],
-            foreground=self.colors['light'],
+            foreground='#ffffff',  # Selalu putih untuk kontras dengan primary
             font=("Poppins", 10, "bold"),
             relief="flat"
         )
@@ -196,20 +279,20 @@ class App(tk.Tk):
         
         style.map("Treeview",
             background=[('selected', self.colors['secondary'])],
-            foreground=[('selected', self.colors['light'])]
+            foreground=[('selected', '#ffffff')]  # Selalu putih untuk selected row
         )
 
         # Custom label styles
         style.configure("Clock.TLabel",
             font=("Poppins", 42, "bold"),
             foreground=self.colors['primary'],
-            background=self.colors['bg']
+            background=self.colors['light']
         )
         
         style.configure("Date.TLabel",
             font=("Poppins", 13),
             foreground=self.colors['text'],
-            background=self.colors['bg']
+            background=self.colors['light']
         )
         
         style.configure("CardTitle.TLabel",
@@ -234,6 +317,23 @@ class App(tk.Tk):
             font=("Poppins", 11, "bold")
         )
 
+    def _build_menu(self):
+        """Buat menu bar"""
+        menubar = tk.Menu(self, bg=self.colors['light'], fg=self.colors['text'])
+        self.config(menu=menubar)
+        
+        # Menu Settings
+        settings_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['light'], fg=self.colors['text'])
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+        settings_menu.add_command(label="⚙️ Preferences", command=self._open_settings)
+        settings_menu.add_separator()
+        settings_menu.add_command(label="🚪 Keluar", command=self.quit)
+        
+        # Menu Help
+        help_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['light'], fg=self.colors['text'])
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="ℹ️ About", command=self._show_about)
+    
     def _build_header(self):
         header = ttk.Frame(self, style="Card.TFrame", padding=(20, 15))
         header.pack(fill="x", padx=15, pady=(15, 10))
@@ -272,7 +372,7 @@ class App(tk.Tk):
             except Exception:
                 pass
 
-        # Right side - Toggle and buttons
+        # Right side - Toggle
         right = ttk.Frame(header, style="Card.TFrame")
         right.pack(side="right")
         
@@ -300,28 +400,6 @@ class App(tk.Tk):
         self.master_toggle = ToggleSwitch(ms_frame, on=True, command=self._on_master_toggle)
         self.master_toggle.pack(side="left")
 
-        # Autostart dengan label yang lebih jelas
-        autostart_frame = ttk.Frame(right, style="Card.TFrame")
-        autostart_frame.pack(side="top", anchor="e", pady=(10, 0))
-        
-        self.autostart_var = tk.IntVar(value=1)
-        # Gunakan tk.Checkbutton untuk kontrol lebih baik atas tampilan
-        autostart_cb = tk.Checkbutton(
-            autostart_frame,
-            text="Jalankan otomatis saat komputer dinyalakan",
-            variable=self.autostart_var,
-            command=self._toggle_autostart,
-            bg=self.colors['light'],
-            fg=self.colors['text'],
-            font=("Poppins", 9),
-            activebackground=self.colors['light'],
-            activeforeground=self.colors['text'],
-            selectcolor=self.colors['light'],
-            highlightthickness=0,
-            bd=0
-        )
-        autostart_cb.pack(side="left")
-
         if not self.audio.ok:
             ttk.Label(
                 right, foreground=self.colors['danger'], 
@@ -330,15 +408,28 @@ class App(tk.Tk):
                 font=("Poppins", 9)
             ).pack(side="top", anchor="e", pady=(8, 0))
 
-        # Next schedule card
+        # Next schedule card dengan log activity
         ttk.Separator(self, orient="horizontal").pack(fill="x", padx=15, pady=(10, 10))
         card = ttk.Frame(self, style="Card.TFrame", padding=(20, 12))
         card.pack(fill="x", padx=15, pady=(0, 10))
+        
+        # Left side - Jadwal Berikutnya
         ttk.Label(card, text="📅 Jadwal Berikutnya:", background=self.colors['light'], 
                   font=("Poppins", 10), foreground=self.colors['text']).pack(side="left")
         self.lbl_next = ttk.Label(card, text="-", background=self.colors['light'], 
                                   font=("Poppins", 10, "bold"), foreground=self.colors['text'])
         self.lbl_next.pack(side="left", padx=(10, 0))
+        
+        # Right side - Log Activity
+        self.status_var = tk.StringVar(value="Siap")
+        ttk.Label(card, textvariable=self.status_var,
+                  background=self.colors['light'],
+                  foreground=self.colors['text'],
+                  font=("Poppins", 9)).pack(side="right")
+        ttk.Label(card, text="📝 Log:", 
+                  font=("Poppins", 9, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="right", padx=(20, 5))
 
     def _on_master_toggle(self, is_on: bool):
         self._set_status("Master ON: jadwal akan dieksekusi." if is_on else "Master OFF: semua jadwal dihentikan.")
@@ -356,6 +447,15 @@ class App(tk.Tk):
             messagebox.showerror("Autostart", err or "Gagal mengatur autostart")
         else:
             self._set_status("Autostart diubah")
+    
+    def _toggle_autostart_from_settings(self, is_on):
+        """Toggle autostart dari dialog Settings"""
+        self.autostart_var.set(1 if is_on else 0)
+        ok, err = set_autostart(is_on)
+        if not ok:
+            messagebox.showerror("Autostart", err or "Gagal mengatur autostart")
+        else:
+            self._set_status("Autostart " + ("diaktifkan" if is_on else "dinonaktifkan"))
 
     def _build_panes(self):
         panes = ttk.PanedWindow(self, orient="horizontal")
@@ -397,7 +497,12 @@ class App(tk.Tk):
             command=self._refresh_buttons_state,
             justify='center',
             validate='key',
-            validatecommand=vcmd_hour
+            validatecommand=vcmd_hour,
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            buttonbackground=self.colors['primary'],
+            relief='solid',
+            borderwidth=1
         )
         self.spin_hour.delete(0, "end")
         self.spin_hour.insert(0, "07")
@@ -427,7 +532,12 @@ class App(tk.Tk):
             command=self._refresh_buttons_state,
             justify='center',
             validate='key',
-            validatecommand=vcmd_minute
+            validatecommand=vcmd_minute,
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            buttonbackground=self.colors['primary'],
+            relief='solid',
+            borderwidth=1
         )
         self.spin_minute.delete(0, "end")
         self.spin_minute.insert(0, "00")
@@ -576,18 +686,6 @@ class App(tk.Tk):
         self.tree.column("name", width=w_name)
         self.tree.column("days", width=w_days)
         self.tree.column("sound", width=w_sound)
-
-    def _build_statusbar(self):
-        bar = ttk.Frame(self, style="Card.TFrame", padding=(20, 10)); bar.pack(fill="x", padx=15, pady=(0, 15))
-        ttk.Label(bar, text="📝 Log:", 
-                  font=("Poppins", 9, "bold"),
-                  background=self.colors['light'],
-                  foreground=self.colors['dark']).pack(side="left")
-        self.status_var = tk.StringVar(value="Siap")
-        ttk.Label(bar, textvariable=self.status_var,
-                  background=self.colors['light'],
-                  foreground=self.colors['text'],
-                  font=("Poppins", 9)).pack(side="left", padx=10)
 
     def _set_status(self, text):
         self.status_var.set(text)
@@ -779,6 +877,8 @@ class App(tk.Tk):
 
     def _set_btn(self, btn, ok):
         btn.configure(state=("normal" if ok else "disabled"))
+        # Ubah cursor untuk visual feedback
+        btn.configure(cursor=("hand2" if ok else "arrow"))
 
     def _load_table(self):
         sort_key = getattr(self, "_sort_key", None)
@@ -790,7 +890,7 @@ class App(tk.Tk):
         self._rows_all = [
             {
                 "id": sid, "name": name, "time": tstr, "days_raw": days,
-                "days": days_to_label(days), "sound": sound,
+                "days": days_to_label(days), "sound": os.path.basename(sound),
                 "status": "Aktif" if active else "Nonaktif", "active": active,
             }
             for (sid, name, tstr, days, sound, active) in rows
@@ -1053,3 +1153,279 @@ class App(tk.Tk):
         except Exception:
             pass
         self.destroy()
+
+    def _open_settings(self):
+        """Buka dialog Settings"""
+        dialog = tk.Toplevel(self)
+        dialog.title("Settings")
+        dialog.geometry("500x500")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Configure colors
+        dialog.configure(bg=self.colors['bg'])
+        
+        # Main container
+        container = ttk.Frame(dialog, style="Card.TFrame", padding=20)
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        ttk.Label(
+            container,
+            text="⚙️ Settings",
+            font=("Poppins", 16, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(pady=(0, 20))
+        
+        # Dark Mode Toggle
+        dark_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
+        dark_frame.pack(fill="x", pady=(0, 15))
+        
+        ttk.Label(
+            dark_frame,
+            text="🌙 Dark Mode",
+            font=("Poppins", 11, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="left")
+        
+        dark_toggle = ToggleSwitch(
+            dark_frame,
+            width=70,
+            height=28,
+            on=self.dark_mode,
+            command=lambda on: self._toggle_dark_mode(on, dialog)
+        )
+        dark_toggle.pack(side="right")
+        # Update background toggle agar sesuai dengan parent
+        dark_toggle.configure(bg=self.colors['light'])
+        
+        # Separator
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=15)
+        
+        # Autostart Setting
+        autostart_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
+        autostart_frame.pack(fill="x", pady=(0, 15))
+        
+        ttk.Label(
+            autostart_frame,
+            text="🚀 Autostart",
+            font=("Poppins", 11, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="left")
+        
+        autostart_toggle = ToggleSwitch(
+            autostart_frame,
+            width=70,
+            height=28,
+            on=bool(self.autostart_var.get()),
+            command=lambda on: self._toggle_autostart_from_settings(on)
+        )
+        autostart_toggle.pack(side="right")
+        # Update background toggle agar sesuai dengan parent
+        autostart_toggle.configure(bg=self.colors['light'])
+        
+        ttk.Label(
+            autostart_frame,
+            font=("Poppins", 9),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="left", padx=(10, 0))
+        
+        # Separator
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=15)
+        
+        # Volume Control
+        volume_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
+        volume_frame.pack(fill="x", pady=(0, 15))
+        
+        # Volume header
+        volume_header = ttk.Frame(volume_frame, style="Card.TFrame")
+        volume_header.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(
+            volume_header,
+            text="🔊 Volume",
+            font=("Poppins", 11, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="left")
+        
+        # Volume percentage label
+        current_volume = int(self.audio.get_volume() * 100)
+        volume_label = ttk.Label(
+            volume_header,
+            text=f"{current_volume}%",
+            font=("Poppins", 10, "bold"),
+            background=self.colors['light'],
+            foreground=self.colors['primary']
+        )
+        volume_label.pack(side="right")
+        
+        # Volume slider
+        volume_slider_frame = ttk.Frame(volume_frame, style="Card.TFrame")
+        volume_slider_frame.pack(fill="x", pady=(0, 10))
+        
+        def on_volume_change(val):
+            volume = float(val) / 100
+            self.audio.set_volume(volume)
+            volume_label.configure(text=f"{int(val)}%")
+            self._set_status(f"Volume diatur ke {int(val)}%")
+        
+        volume_slider = tk.Scale(
+            volume_slider_frame,
+            from_=0,
+            to=100,
+            orient="horizontal",
+            command=on_volume_change,
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            highlightthickness=0,
+            troughcolor=self.colors['border'],
+            activebackground=self.colors['primary'],
+            sliderrelief="flat",
+            font=("Poppins", 9)
+        )
+        volume_slider.set(current_volume)
+        volume_slider.pack(fill="x")
+        
+        # Volume icons
+        volume_icons_frame = ttk.Frame(volume_frame, style="Card.TFrame")
+        volume_icons_frame.pack(fill="x")
+        
+        ttk.Label(
+            volume_icons_frame,
+            text="🔈",
+            font=("Poppins", 10),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="left")
+        
+        ttk.Label(
+            volume_icons_frame,
+            text="🔊",
+            font=("Poppins", 10),
+            background=self.colors['light'],
+            foreground=self.colors['text']
+        ).pack(side="right")
+        
+        # Separator
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=15)
+        
+        # About Section
+        about_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
+        about_frame.pack(fill="both", expand=True)
+        
+    
+        
+        info_text = f"""
+
+        """
+        
+        info_label = tk.Label(
+            about_frame,
+            text=info_text.strip(),
+            font=("Poppins", 9),
+            bg=self.colors['light'],
+            fg=self.colors['text'],
+            justify="left"
+        )
+        info_label.pack(anchor="w", fill="both", expand=True)
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+    def _toggle_dark_mode_menu(self):
+        """Toggle dark mode dari menu"""
+        self.dark_mode = not self.dark_mode
+        self._apply_theme()
+        self._set_status("Dark mode " + ("diaktifkan" if self.dark_mode else "dinonaktifkan"))
+    
+    def _toggle_autostart_menu(self):
+        """Toggle autostart dari menu"""
+        current = bool(self.autostart_var.get())
+        new_val = not current
+        self.autostart_var.set(1 if new_val else 0)
+        ok, err = set_autostart(new_val)
+        if not ok:
+            messagebox.showerror("Autostart", err or "Gagal mengatur autostart")
+        else:
+            self._set_status("Autostart " + ("diaktifkan" if new_val else "dinonaktifkan"))
+    
+    def _show_about(self):
+        """Tampilkan dialog About"""
+        info_text = f"""
+{APP_TITLE}
+Versi: {APP_VERSION}
+
+Dikembangkan untuk:
+SMP Muhammadiyah 3 Purwokerto
+
+Developer:
+Nama: Abdul Company
+Email: abdulroni0616@gmail.com
+
+© 2025 Abdul Company. All rights reserved.
+        """
+        messagebox.showinfo("About", info_text.strip())
+    
+    def _toggle_dark_mode(self, is_on, settings_dialog=None):
+        """Toggle dark mode"""
+        self.dark_mode = is_on
+        
+        # Switch color scheme
+        if is_on:
+            self.colors = self.dark_colors.copy()
+        else:
+            self.colors = self.light_colors.copy()
+        
+        # Close settings dialog jika ada
+        if settings_dialog:
+            settings_dialog.destroy()
+        
+        # Refresh UI
+        self._apply_theme()
+        self._set_status(f"Dark mode {'diaktifkan' if is_on else 'dinonaktifkan'}")
+
+    def _apply_theme(self):
+        """Apply theme to all widgets"""
+        # Update main window
+        self.configure(bg=self.colors['bg'])
+        
+        # Re-configure ttk styles
+        self._use_theme()
+        
+        # Refresh all widgets by rebuilding UI
+        # Clear all widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+        
+        # Rebuild UI
+        self._build_menu()
+        self._build_header()
+        
+        # PERBAIKAN: Setelah _build_header, perbarui ToggleSwitch
+        # Warna latar belakang parent (light)
+        parent_bg = self.colors['light']
+        
+        # Update Master Control Toggle (ToggleSwitch)
+        # ToggleSwitch juga turunan tk.Canvas, harus di-update
+        if hasattr(self, 'master_toggle'):
+            try:
+                self.master_toggle.configure(bg=parent_bg)
+            except Exception:
+                pass
+        
+        self._build_panes()
+        self._load_table()
+        
+        # Refresh state
+        self._refresh_buttons_state()
+        self._update_next_label()
+

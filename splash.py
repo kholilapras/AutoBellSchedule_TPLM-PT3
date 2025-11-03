@@ -14,8 +14,8 @@ class SplashScreen(tk.Toplevel):
         self.title("")
         self.overrideredirect(True)  # Remove window border
         
-        # Set size - lebih tinggi agar logo tidak terpotong
-        width = 600
+        # Set size - persegi panjang (landscape)
+        width = 800
         height = 500
         
         # Center on screen
@@ -116,7 +116,7 @@ class SplashScreen(tk.Toplevel):
         # Version
         version = tk.Label(
             container,
-            text="Version 1.0",
+            text="Version 1.0.0",
             font=("Poppins", 9),
             bg=self.colors['bg'],
             fg=self.colors['secondary']
