@@ -1180,8 +1180,8 @@ class App(tk.Tk):
         ).pack(pady=(0, 20))
         
         # Dark Mode Toggle
-        dark_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
-        dark_frame.pack(fill="x", pady=(0, 15))
+        dark_frame = ttk.Frame(container, style="Card.TFrame", padding=10)
+        dark_frame.pack(fill="x", pady=(0, 10))
         
         ttk.Label(
             dark_frame,
@@ -1191,6 +1191,7 @@ class App(tk.Tk):
             foreground=self.colors['text']
         ).pack(side="left")
         
+        
         dark_toggle = ToggleSwitch(
             dark_frame,
             width=70,
@@ -1199,15 +1200,16 @@ class App(tk.Tk):
             command=lambda on: self._toggle_dark_mode(on, dialog)
         )
         dark_toggle.pack(side="right")
+        
         # Update background toggle agar sesuai dengan parent
         dark_toggle.configure(bg=self.colors['light'])
         
         # Separator
-        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=15)
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=10)
         
         # Autostart Setting
-        autostart_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
-        autostart_frame.pack(fill="x", pady=(0, 15))
+        autostart_frame = ttk.Frame(container, style="Card.TFrame", padding=10)
+        autostart_frame.pack(fill="x", pady=(0, 10))
         
         ttk.Label(
             autostart_frame,
@@ -1236,11 +1238,11 @@ class App(tk.Tk):
         ).pack(side="left", padx=(10, 0))
         
         # Separator
-        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=15)
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=10)
         
         # Volume Control
-        volume_frame = ttk.Frame(container, style="Card.TFrame", padding=15)
-        volume_frame.pack(fill="x", pady=(0, 15))
+        volume_frame = ttk.Frame(container, style="Card.TFrame", padding=10)
+        volume_frame.pack(fill="x", pady=(0, 10))
         
         # Volume header
         volume_header = ttk.Frame(volume_frame, style="Card.TFrame")
@@ -1253,6 +1255,14 @@ class App(tk.Tk):
             background=self.colors['light'],
             foreground=self.colors['text']
         ).pack(side="left")
+        ttk.Label(
+    volume_frame, # Pasang label deskripsi di volume_frame, di bawah header
+    text="Atur tingkat kekerasan suara bel dan pengumuman yang akan diputar oleh aplikasi. (Skala 0 hingga 100)",
+    font=("Poppins", 9),
+    background=self.colors['light'],
+    foreground=self.colors['text'],
+    wraplength=400 # Batasi panjang teks
+).pack(anchor="w", pady=(2, 8))
         
         # Volume percentage label
         current_volume = int(self.audio.get_volume() * 100)
