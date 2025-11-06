@@ -22,7 +22,7 @@ class TrayController:
             self.update_icon()
             return
         menu = pystray.Menu(
-            pystray.MenuItem("Tampilkan/Sembunyikan", self._toggle_show),
+            pystray.MenuItem("Tampilkan", self._show),
             pystray.MenuItem(lambda item: "Master ON" if not self.app.master_toggle.get() else "Master OFF", self._toggle_master),
             pystray.MenuItem("Keluar", self._quit)
         )
@@ -38,7 +38,12 @@ class TrayController:
                 pass
 
     def _toggle_show(self, icon, item):
-        self.app.after(0, lambda: self.app.restore_from_tray() if not self.app.winfo_viewable() else self.app.minimize_to_tray())
+        # legacy toggle: keep for compatibility but map to show
+        self.app.after(0, self.app.restore_from_tray)
+
+    def _show(self, icon, item):
+        """Menu handler: always restore/show the main window."""
+        self.app.after(0, self.app.restore_from_tray)
 
     def _toggle_master(self, icon, item):
         self.app.after(0, lambda: (self.app.master_toggle.set(not self.app.master_toggle.get()), self.app._on_master_toggle(self.app.master_toggle.get())))

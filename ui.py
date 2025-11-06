@@ -107,7 +107,9 @@ class App(tk.Tk):
         self._start_control_server()
 
         self.tray = TrayController(self, logo_path, fallback_img=None)
+        # Close (X) should minimize to tray; regular minimize button should go to taskbar.
         self.protocol("WM_DELETE_WINDOW", self.minimize_to_tray)
+        # Keep Unmap binding for status updates only (do NOT forward minimize to tray here)
         self.bind("<Unmap>", self._on_minimize)
         self._tick_clock()
 
@@ -223,6 +225,14 @@ class App(tk.Tk):
             foreground=self.colors['text'],
             borderwidth=1,
             relief="solid"
+        )
+
+        # Combobox styling: make height/vertical padding match TEntry and avoid forcing foreground
+        style.configure("TCombobox",
+            font=("Poppins", 10),
+            padding=8,
+            fieldbackground=self.colors['light'],
+            background=self.colors['light']
         )
         
         style.map("TEntry",
@@ -642,13 +652,32 @@ class App(tk.Tk):
         panes.add(self.frm_right, weight=3)
 
         tools = ttk.Frame(self.frm_right, style="Card.TFrame"); tools.pack(fill="x", pady=(4, 10))
+        # Search label + entry
         ttk.Label(tools, text="🔍 Cari:",
                   font=("Poppins", 9, "bold"),
                   background=self.colors['light'],
                   foreground=self.colors['dark']).pack(side="left")
         self.search_var = tk.StringVar()
-        ent = ttk.Entry(tools, textvariable=self.search_var, width=35); ent.pack(side="left", padx=(8, 0))
+        ent = ttk.Entry(tools, textvariable=self.search_var, width=30); ent.pack(side="left", padx=(8, 12))
         self.search_var.trace_add("write", lambda *_: self._apply_filter())
+
+        # Day filter dropdown (di sebelah "Cari :")
+        ttk.Label(tools, text="📅 Hari:",
+                  font=("Poppins", 9, "bold"),
+                  background=self.colors['light'],
+                  foreground=self.colors['dark']).pack(side="left")
+        # HARI_ID sudah tersedia di _build_panes scope (diimpor sebelumnya)
+        try:
+            from utils import HARI_ID
+            day_options = ["All"] + list(HARI_ID)
+        except Exception:
+            day_options = ["All", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+        self.day_filter_var = tk.StringVar(value="All")
+        self.day_filter = ttk.Combobox(tools, textvariable=self.day_filter_var, values=day_options, state="readonly", width=12)
+        self.day_filter.current(0)
+        self.day_filter.pack(side="left", padx=(8, 0))
+        self.day_filter.bind("<<ComboboxSelected>>", lambda e: self._apply_filter())
 
         # === Tidak menampilkan ID; gunakan No (nomor urut) ===
         cols = ("no", "name", "time", "days", "status", "sound")
@@ -906,8 +935,10 @@ class App(tk.Tk):
     def _apply_filter(self):
         q = (self.search_var.get() if hasattr(self, "search_var") else "").lower().strip()
         if not hasattr(self, "_rows_all"): return
+
+        # First apply text search filter
         if q:
-            self._rows_filtered = [
+            filtered = [
                 r for r in self._rows_all
                 if q in r["name"].lower()
                 or q in r["time"].lower()
@@ -916,7 +947,28 @@ class App(tk.Tk):
                 or q in r["sound"].lower()
             ]
         else:
-            self._rows_filtered = list(self._rows_all)
+            filtered = list(self._rows_all)
+
+        # Then apply day filter (if any)
+        day_sel = (self.day_filter_var.get() if hasattr(self, "day_filter_var") else "All")
+        if day_sel and day_sel != "All":
+            try:
+                from utils import HARI_ID
+                day_idx = HARI_ID.index(day_sel)
+            except Exception:
+                day_idx = None
+
+            if day_idx is not None:
+                def matches_day(r):
+                    try:
+                        # r["days_raw"] contains CSV like "0,1,2"
+                        days = parse_days_csv(r.get("days_raw", ""))
+                        return day_idx in days
+                    except Exception:
+                        return False
+                filtered = [r for r in filtered if matches_day(r)]
+
+        self._rows_filtered = filtered
         self._redraw_rows(self._rows_filtered)
 
     def _redraw_rows(self, rows):
@@ -1132,19 +1184,30 @@ class App(tk.Tk):
 
     def minimize_to_tray(self):
         self.withdraw()
-        self._set_status("Berjalan di tray.")
         try: self.tray.ensure()
         except Exception: pass
 
     def _on_minimize(self, event):
-        if event.widget == self and self.state() == "iconic":
-            self.after(0, self.minimize_to_tray)
+        # Called on <Unmap>. Do nothing for normal minimize (do not set any status)
+        # so we avoid showing "Diminimalkan ke taskbar." message.
+        return
 
     def restore_from_tray(self):
-        self.deiconify(); self.lift(); self.focus_force()
-        self._set_status("Ditampilkan kembali.")
-        try: self.tray.update_icon()
-        except Exception: pass
+        try:
+            # Restore window from tray/menu and bring to front in a standard way.
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+        except Exception:
+            try:
+                # Fallback: ensure window is deiconified and raised
+                self.deiconify(); self.lift(); self.focus_force()
+            except Exception:
+                pass
+        try:
+            self.tray.update_icon()
+        except Exception:
+            pass
 
     def _exit_app(self):
         try:
