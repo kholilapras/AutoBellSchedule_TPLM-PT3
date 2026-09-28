@@ -391,7 +391,7 @@ class App(tk.Tk):
         self._sort_key = key
 
         def k(row):
-            if key == "id": return int(row["id"])      # klik "No" → urut ID asli
+            if key == "id": return int(row["id"]) 
             if key == "time": return row["time"]
             if key == "days": return row["days"]
             if key == "status": return row["status"]
